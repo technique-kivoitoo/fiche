@@ -430,13 +430,14 @@
     };
 
     donnees.idLocal = 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    demanderPastille();
     var b = $('valider'); b.disabled = true;
     fileAjouter({ idLocal: donnees.idLocal, client: nomClient, creeLe: Date.now(), donnees: donnees })
       .then(function () {
         b.disabled = false;
         message('Fiche enregistrée sur le téléphone. ' + (navigator.onLine
           ? 'Envoi en cours, vous pouvez commencer la fiche suivante.'
-          : 'Elle partira toute seule dès que le réseau revient (gardez la page ouverte).'), 'ok');
+          : 'Pas de réseau : elle est gardée sur le téléphone. Rouvrez l’appli dès que vous avez du réseau pour l’envoyer.'), 'ok');
         effacerBrouillon();
         reinitialiser();
         traiterFile();
@@ -489,14 +490,29 @@
     $('bandeauTxt').textContent = txt || '';
   }
 
+  /* Pastille rouge sur l'icône de l'appli = nombre de fiches pas encore envoyées */
+  function pastille(n) {
+    try {
+      if (n > 0 && navigator.setAppBadge) navigator.setAppBadge(n).catch(function () {});
+      else if (navigator.clearAppBadge) navigator.clearAppBadge().catch(function () {});
+    } catch (e) { /* téléphone sans pastille : rien à faire */ }
+  }
+  // L'iPhone n'affiche la pastille qu'avec l'autorisation des notifications : demandée une seule fois, au premier clic sur Valider
+  function demanderPastille() {
+    try {
+      if (navigator.setAppBadge && window.Notification && Notification.permission === 'default') Notification.requestPermission();
+    } catch (e) { /* rien */ }
+  }
+
   var envoiEnCours = false;
   function traiterFile() {
     if (envoiEnCours) return;
     envoiEnCours = true;   // posé tout de suite : deux déclenchements simultanés n'envoient pas deux fois
     fileLister().then(function (liste) {
       liste = (liste || []).sort(function (a, b) { return a.creeLe - b.creeLe; });
-      if (!liste.length) { envoiEnCours = false; bandeau(''); return; }
+      if (!liste.length) { envoiEnCours = false; bandeau(''); pastille(0); return; }
       var n = liste.length, s = n > 1 ? 's' : '';
+      pastille(n);
       if (!navigator.onLine) { envoiEnCours = false; bandeau(n + ' fiche' + s + ' en attente : envoi dès que le réseau revient'); return; }
       bandeau('Envoi en cours… (' + n + ' fiche' + s + ' en attente)');
       var f = liste[0];
