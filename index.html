@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fiche intervention Kivoitoo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icone-180.png">
+<link rel="icon" href="icone-192.png">
+<meta name="theme-color" content="#1F3864">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fiche inter">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+  :root { --bleu: #1F3864; --fond: #f3f5f9; --bord: #cfd6e2; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; margin: 0; background: var(--fond); color: #222; font-size: 16px; }
+  header { background: #fff; border-bottom: 4px solid var(--bleu); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  header img { height: 34px; display: none; }
+  header .nom { font-size: 15px; font-weight: bold; color: var(--bleu); }
+  main { padding: 12px 16px 40px; max-width: 640px; margin: auto; }
+  .carte { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  h2 { font-size: 15px; color: var(--bleu); margin: 0 0 6px; }
+  label { display: block; font-size: 14px; font-weight: bold; margin: 12px 0 4px; }
+  input, select, textarea { width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--bord); border-radius: 8px; background: #fff; font-family: inherit; }
+  textarea { min-height: 80px; resize: vertical; }
+  .ligne { display: flex; gap: 10px; }
+  .ligne > div { flex: 1; min-width: 0; }
+  .btn { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--bleu); background: #fff; color: var(--bleu); font-size: 15px; cursor: pointer; white-space: nowrap; }
+  .btn-plein { background: var(--bleu); color: #fff; width: 100%; padding: 14px; font-size: 17px; border: none; border-radius: 10px; margin-top: 12px; cursor: pointer; }
+  .btn-plein:disabled { opacity: .6; }
+  .avec-bouton { display: flex; gap: 8px; }
+  .avec-bouton input { flex: 1; min-width: 0; }
+  .case { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+  .case input { width: 22px; height: 22px; flex: none; }
+  .vignettes img { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; margin: 6px 6px 0 0; }
+  canvas { display: block; width: 100%; height: 180px; border: 1px dashed var(--bord); border-radius: 8px; background: #fff; touch-action: none; }
+  .msg { padding: 12px; border-radius: 8px; margin-bottom: 12px; display: none; }
+  .ok { background: #e3f4e6; color: #1b5e20; }
+  .err { background: #fde8e8; color: #9b1c1c; }
+  .cache { display: none; }
+  .aide { font-size: 13px; color: #666; margin-top: 6px; }
+  .bandeau { display: none; justify-content: space-between; align-items: center; gap: 8px; background: #fff4d6; color: #7a5200; padding: 10px 16px; font-size: 14px; }
+  .bandeau .btn { padding: 6px 10px; font-size: 13px; }
+  .pile { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
+  .pile label { flex: 1; display: flex; align-items: center; gap: 10px; margin: 0; font-weight: normal; }
+  .pile label input { width: 22px; height: 22px; flex: none; }
+  .pile .pileQte { width: 80px; flex: none; text-align: center; }
+  .combo { position: relative; }
+  .suggestions { display: none; position: absolute; left: 0; right: 0; top: 100%; z-index: 20; background: #fff; border: 1px solid var(--bord); border-radius: 8px; max-height: 280px; overflow-y: auto; -webkit-overflow-scrolling: touch; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+  .suggestions div { padding: 11px 12px; border-bottom: 1px solid #eef1f6; font-size: 15px; cursor: pointer; }
+  .suggestions div:active { background: #eef1f6; }
+  .suggestions small { display: block; color: #888; font-size: 12px; margin-top: 2px; }
+</style>
+</head>
+<body>
+<header><img id="logo" alt="Kivoitoo" src="logo.png" style="display:block"><span class="nom">Fiche d'intervention</span></header>
+<div id="bandeau" class="bandeau"><span id="bandeauTxt"></span><button type="button" class="btn" id="btnRenvoyer">Envoyer maintenant</button></div>
+<main>
+  <div id="msg" class="msg"></div>
+
+  <!-- Écran du code d'accès -->
+  <div id="ecranCode" class="carte">
+    <h2>Accès</h2>
+    <label for="code">Code d'accès</label>
+    <input id="code" type="password" inputmode="numeric">
+    <button class="btn-plein" id="btnCode" type="button">Valider</button>
+  </div>
+
+  <!-- Fiche -->
+  <form id="fiche" class="cache" autocomplete="off" novalidate>
+    <div class="carte">
+      <h2>Intervention</h2>
+      <div class="ligne">
+        <div><label for="date">Date</label><input id="date" type="date"></div>
+        <div><label for="technicien">Technicien</label><select id="technicien"></select></div>
+      </div>
+      <label for="client">Client</label>
+      <div class="combo">
+        <input id="client" placeholder="Tapez les premières lettres du client" autocomplete="off" autocorrect="off" autocapitalize="characters">
+        <div id="suggestions" class="suggestions"></div>
+      </div>
+      <label for="adresse">Adresse du site</label><input id="adresse">
+      <label for="codeTransmetteur">Code transmetteur</label><input id="codeTransmetteur">
+      <label for="type">Type d'intervention</label>
+      <select id="type">
+        <option>Installation</option>
+        <option>Maintenance</option>
+        <option>Remplacement SIM</option>
+        <option>Remplacement centrale</option>
+        <option>Changement de pile</option>
+        <option>Autre</option>
+      </select>
+      <div id="blocAutreType" class="avec-bouton cache">
+        <input id="autreType" placeholder="Autre : tapez le type d'intervention">
+        <button type="button" class="btn" id="retourType" aria-label="Revenir à la liste">✕</button>
+      </div>
+      <label>Envoyer dans le dossier</label>
+      <label class="case" style="font-weight:normal"><input id="dosIntervention" type="radio" name="dossier" checked> Intervention appli</label>
+      <label class="case" style="font-weight:normal"><input id="dosFacturation" type="radio" name="dossier"> Facturation intervention</label>
+      <div class="ligne">
+        <div><label for="heureArrivee">Arrivée</label><input id="heureArrivee" type="time"></div>
+        <div><label for="heureDepart">Départ</label><input id="heureDepart" type="time"></div>
+      </div>
+    </div>
+
+    <div class="carte">
+      <h2>Travaux</h2>
+      <label for="travaux">Travaux réalisés</label><textarea id="travaux"></textarea>
+      <label for="materiel">Matériel posé ou remplacé</label><textarea id="materiel"></textarea>
+    </div>
+
+    <div class="carte">
+      <label class="case"><input id="pilesRemplacees" type="checkbox"> Piles remplacées</label>
+      <div id="blocPiles" class="cache">
+        <label>Cocher les piles et indiquer le nombre</label>
+        <div id="listePiles"></div>
+      </div>
+    </div>
+
+    <div class="carte">
+      <label class="case"><input id="simRemplacee" type="checkbox"> Carte SIM remplacée</label>
+      <div id="blocSim" class="cache">
+        <label for="photoSim">Photo de la nouvelle carte SIM</label>
+        <input id="photoSim" type="file" accept="image/*" capture="environment">
+        <div id="vignetteSim" class="vignettes"></div>
+        <label for="refAncienne">Référence ancienne SIM</label>
+        <input id="refAncienne" autocapitalize="characters">
+        <label for="refSim">Référence nouvelle SIM</label>
+        <input id="refSim" placeholder="ex : D 570" autocapitalize="characters">
+        <label for="remarqueSim">Commentaire</label>
+        <textarea id="remarqueSim" style="min-height:60px"></textarea>
+      </div>
+    </div>
+
+    <div class="carte">
+      <h2>Signature du client</h2>
+      <label for="signataire">Nom du signataire</label><input id="signataire">
+      <label>Signature</label>
+      <canvas id="sig"></canvas>
+      <button type="button" class="btn" id="effacer" style="margin-top:8px">Effacer la signature</button>
+      <label for="emailClient">Email du client</label><input id="emailClient" type="email">
+      <label class="case" style="font-weight:normal"><input id="envoyerClient" type="checkbox"> Envoyer la fiche au client par mail</label>
+    </div>
+
+    <button class="btn-plein" id="valider" type="submit">Valider la fiche</button>
+  </form>
+
+</main>
+
+<script>
+  var listes = { clients: [], techniciens: [] };
+  var photos = [];
+  var photoSim = '';
+  var codeAcces = '';
+  function $(id) { return document.getElementById(id); }
+  function deux(n) { return (n < 10 ? '0' : '') + n; }
+  function heureMaintenant() { var d = new Date(); return deux(d.getHours()) + ':' + deux(d.getMinutes()); }
+
+  function message(txt, type) {
+    var m = $('msg'); m.textContent = txt; m.className = 'msg ' + type; m.style.display = 'block';
+    window.scrollTo(0, 0);
+  }
+  function cacherMessage() { $('msg').style.display = 'none'; }
+
+  function memoire(cle, val) {
+    try {
+      if (val === undefined) return localStorage.getItem(cle);
+      localStorage.setItem(cle, val);
+    } catch (e) { return null; }
+  }
+
+  /* ---------- Échanges avec le serveur (Google Apps Script) ---------- */
+  var API = 'https://script.google.com/macros/s/AKfycbwAPuJIFwaabe7wHEcBDB3H_i7sS0Aa92IXzYzR-0T5GL0vN4aeD0SBc5C-a7sEzUEQFg/exec';
+  function appelServeur(action, code, donnees) {
+    // Corps en texte simple : pas de requête préalable du navigateur, compatible avec Apps Script
+    return fetch(API, { method: 'POST', body: JSON.stringify({ action: action, code: code || '', donnees: donnees || null }) })
+      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        if (!r || !r.ok) { var e = new Error((r && r.erreur) || 'Réponse invalide du serveur'); e.serveur = true; throw e; }
+        return r.resultat;
+      });
+  }
+
+  /* ---------- Accès ---------- */
+  $('btnCode').onclick = function () { connecter($('code').value); };
+  $('code').onkeydown = function (e) { if (e.key === 'Enter') connecter(this.value); };
+
+  function connecter(code) {
+    cacherMessage();
+    $('btnCode').disabled = true;
+    appelServeur('listes', code)
+      .then(function (l) {
+        $('btnCode').disabled = false;
+        codeAcces = code; memoire('codeAcces', code); listes = l;
+        memoire('listes', JSON.stringify(l));
+        remplirListes();
+        $('ecranCode').classList.add('cache');
+        $('fiche').classList.remove('cache');
+        if (!ficheInit) initFiche();
+        traiterFile();
+      })
+      .catch(function (err) {
+        $('btnCode').disabled = false;
+        if (err.serveur && /code/i.test(err.message)) {
+          // Code absent ou faux : on le demande (la fiche reste utilisable avec les listes en mémoire)
+          memoire('codeAcces', ''); $('ecranCode').classList.remove('cache');
+          message(code ? 'Code incorrect.' : "Entrez le code de l'appli (une seule fois).", 'err');
+        }
+        // Pas de réseau : on garde les listes en mémoire, rien à afficher
+      });
+  }
+
+  /* ---------- Listes ---------- */
+  function option(sel, val, txt) {
+    var o = document.createElement('option'); o.value = val; o.textContent = txt; sel.appendChild(o);
+  }
+  function remplirListes() {
+    var t = $('technicien'); t.innerHTML = ''; option(t, '', 'Choisir…');
+    listes.techniciens.forEach(function (n) { option(t, n, n); });
+    var tm = memoire('technicien'); if (tm && listes.techniciens.indexOf(tm) >= 0) t.value = tm;
+    remplirPiles();
+  }
+  var PILES_DEFAUT = ['LSH20', 'LR20', 'LS14500', 'CR123A', 'CR2032', 'CR2', 'CR2450', 'AA lithium 1,5 V', 'AAA lithium 1,5 V', 'Batterie 12 V 7 Ah'];
+  function remplirPiles() {
+    var lp = $('listePiles'), avant = {};
+    Array.prototype.forEach.call(lp.querySelectorAll('.pile'), function (r) {
+      avant[r.querySelector('.pileCase').getAttribute('data-nom')] = r.querySelector('.pileQte').value;
+    });
+    lp.innerHTML = '';
+    (listes.piles && listes.piles.length ? listes.piles : PILES_DEFAUT).forEach(function (nom) {
+      var ligne = document.createElement('div'); ligne.className = 'pile';
+      var lab = document.createElement('label');
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'pileCase'; cb.setAttribute('data-nom', nom);
+      lab.appendChild(cb); lab.appendChild(document.createTextNode(nom));
+      var q = document.createElement('input'); q.type = 'number'; q.min = '1'; q.inputMode = 'numeric'; q.className = 'pileQte'; q.placeholder = 'Nb';
+      if (avant[nom]) { q.value = avant[nom]; cb.checked = true; }
+      cb.onchange = function () { if (cb.checked && !q.value) q.value = 1; if (!cb.checked) q.value = ''; };
+      q.oninput = function () { cb.checked = Number(q.value) > 0; };
+      ligne.appendChild(lab); ligne.appendChild(q); lp.appendChild(ligne);
+    });
+  }
+  function pilesChoisies() {
+    return Array.prototype.map.call($('listePiles').querySelectorAll('.pile'), function (r) {
+      var cb = r.querySelector('.pileCase');
+      return { nom: cb.getAttribute('data-nom'), qte: Number(r.querySelector('.pileQte').value) || 0, ok: cb.checked };
+    }).filter(function (x) { return x.ok && x.qte > 0; }).map(function (x) { return { nom: x.nom, qte: x.qte }; });
+  }
+  var clientChoisi = null;
+  function choisirClient(cl) {
+    if (cl) {
+      $('adresse').value = cl.adresse; $('codeTransmetteur').value = cl.code; $('emailClient').value = cl.email;
+    } else if (clientChoisi) {
+      $('adresse').value = ''; $('codeTransmetteur').value = ''; $('emailClient').value = '';
+    }
+    clientChoisi = cl;
+  }
+  function simplifier(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function afficherSuggestions() {
+    var v = simplifier($('client').value.trim()), boite = $('suggestions');
+    boite.innerHTML = '';
+    if (!v) { boite.style.display = 'none'; return; }
+    var debut = [], dedans = [];
+    listes.clients.forEach(function (c) {
+      var n = simplifier(c.nom), p = n.indexOf(v);
+      if (p === 0) debut.push(c); else if (p > 0) dedans.push(c);
+    });
+    var res = debut.concat(dedans).slice(0, 60);
+    if (!res.length) { boite.style.display = 'none'; return; }
+    res.forEach(function (c) {
+      var d = document.createElement('div');
+      d.textContent = c.nom;
+      if (c.adresse) { var s = document.createElement('small'); s.textContent = c.adresse; d.appendChild(s); }
+      d.addEventListener('pointerdown', function (e) { e.preventDefault(); });
+      d.addEventListener('click', function () {
+        $('client').value = c.nom; boite.style.display = 'none';
+        choisirClient(c); sauverBrouillon(); $('client').blur();
+      });
+      boite.appendChild(d);
+    });
+    boite.style.display = 'block';
+  }
+  $('client').oninput = function () {
+    var v = this.value.trim().toLowerCase();
+    choisirClient(listes.clients.filter(function (c) { return c.nom.toLowerCase() === v; })[0] || null);
+    afficherSuggestions();
+  };
+  $('client').onfocus = afficherSuggestions;
+  $('client').addEventListener('blur', function () { setTimeout(function () { $('suggestions').style.display = 'none'; }, 200); });
+  function modeAutre(actif) {
+    $('type').classList.toggle('cache', actif);
+    $('blocAutreType').classList.toggle('cache', !actif);
+    if (!actif && $('type').value === 'Autre') $('type').value = 'Installation';
+  }
+  $('type').onchange = function () {
+    if (this.value === 'Changement de pile') { $('pilesRemplacees').checked = true; $('blocPiles').classList.remove('cache'); }
+    if (this.value === 'Autre') { modeAutre(true); $('autreType').focus(); }
+  };
+  $('retourType').onclick = function () { $('autreType').value = ''; modeAutre(false); sauverBrouillon(); };
+  $('technicien').onchange = function () { memoire('technicien', this.value); };
+  $('simRemplacee').onchange = function () { $('blocSim').classList.toggle('cache', !this.checked); };
+  $('pilesRemplacees').onchange = function () { $('blocPiles').classList.toggle('cache', !this.checked); };
+
+  /* ---------- Photos ---------- */
+  function compresser(fichier, max) {
+    return new Promise(function (ok, ko) {
+      var lecteur = new FileReader();
+      lecteur.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          var r = Math.min(1, max / Math.max(img.width, img.height));
+          var cv = document.createElement('canvas');
+          cv.width = Math.round(img.width * r); cv.height = Math.round(img.height * r);
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          ok(cv.toDataURL('image/jpeg', 0.75));
+        };
+        img.onerror = ko; img.src = lecteur.result;
+      };
+      lecteur.onerror = ko; lecteur.readAsDataURL(fichier);
+    });
+  }
+  function vignette(div, url) { var i = document.createElement('img'); i.src = url; div.appendChild(i); }
+
+
+  $('photoSim').onchange = function () {
+    var f = this.files[0]; if (!f) return;
+    compresser(f, 1600).then(function (u) {
+      photoSim = u; $('vignetteSim').innerHTML = ''; vignette($('vignetteSim'), u);
+    });
+    this.value = '';
+  };
+
+  /* ---------- Signature ---------- */
+  var sig = (function () {
+    var cv = $('sig'), ctx = cv.getContext('2d'), dessine = false, vide = true;
+    function taille() {
+      var r = cv.getBoundingClientRect(), ratio = window.devicePixelRatio || 1;
+      cv.width = r.width * ratio; cv.height = r.height * ratio;
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111';
+      vide = true;
+    }
+    function pos(e) { var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+    cv.addEventListener('pointerdown', function (e) {
+      dessine = true; vide = false; cv.setPointerCapture(e.pointerId);
+      var p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y);
+    });
+    cv.addEventListener('pointermove', function (e) {
+      if (!dessine) return; var p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke();
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) {
+      cv.addEventListener(t, function () { dessine = false; });
+    });
+    return {
+      effacer: taille,
+      estVide: function () { return vide; },
+      image: function () {
+        var out = document.createElement('canvas'); out.width = cv.width; out.height = cv.height;
+        var c = out.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, out.width, out.height);
+        c.drawImage(cv, 0, 0);
+        return out.toDataURL('image/png');
+      }
+    };
+  })();
+  $('effacer').onclick = function () { sig.effacer(); };
+
+  /* ---------- Fiche ---------- */
+  var ficheInit = false;
+  function initFiche() {
+    ficheInit = true;
+    var d = new Date();
+    $('date').value = d.getFullYear() + '-' + deux(d.getMonth() + 1) + '-' + deux(d.getDate());
+    $('heureArrivee').value = heureMaintenant();
+    sig.effacer();
+  }
+
+  function reinitialiser() {
+    var tech = $('technicien').value;
+    $('fiche').reset();
+    $('technicien').value = tech;
+    photos = []; photoSim = '';
+    $('vignetteSim').innerHTML = '';
+    $('blocSim').classList.add('cache'); $('blocPiles').classList.add('cache'); modeAutre(false); clientChoisi = null;
+    initFiche();
+  }
+
+  $('fiche').onsubmit = function (e) {
+    e.preventDefault(); cacherMessage();
+    var nomClient = $('client').value.trim();
+    var sim = $('simRemplacee').checked;
+
+    var manque = [];
+    if (!$('technicien').value) manque.push('le technicien');
+    if (!nomClient) manque.push('le client');
+    if (sim && !$('refSim').value.trim()) manque.push('la référence de la nouvelle SIM');
+    if (!$('signataire').value.trim()) manque.push('le nom du signataire');
+    if (sig.estVide()) manque.push('la signature du client');
+    if ($('type').value === 'Autre' && !$('autreType').value.trim()) manque.push("le type d'intervention");
+    if ($('pilesRemplacees').checked && !pilesChoisies().length) manque.push('les piles remplacées et leur nombre');
+    if (!$('dosIntervention').checked && !$('dosFacturation').checked) manque.push('le dossier (Intervention appli ou Facturation intervention)');
+    if (manque.length) { message('Il manque : ' + manque.join(', ') + '.', 'err'); return; }
+
+    if (!$('heureDepart').value) $('heureDepart').value = heureMaintenant();
+
+    var donnees = {
+      codeAcces: codeAcces,
+      date: $('date').value,
+      technicien: $('technicien').value,
+      client: nomClient,
+      adresse: $('adresse').value.trim(),
+      codeTransmetteur: $('codeTransmetteur').value.trim(),
+      type: $('type').value === 'Autre' ? $('autreType').value.trim() : $('type').value,
+      dossiers: [$('dosIntervention').checked ? 'Intervention' : '', $('dosFacturation').checked ? 'Facturation intervention' : ''].filter(Boolean),
+      heureArrivee: $('heureArrivee').value,
+      heureDepart: $('heureDepart').value,
+      travaux: $('travaux').value.trim(),
+      materiel: $('materiel').value.trim(),
+      photos: photos,
+      simRemplacee: sim,
+      refSim: sim ? $('refSim').value.trim() : '',
+      refAncienne: sim ? $('refAncienne').value.trim() : '',
+      piles: $('pilesRemplacees').checked ? pilesChoisies() : [],
+      remarqueSim: sim ? $('remarqueSim').value.trim() : '',
+      photoSim: sim ? photoSim : '',
+      signataire: $('signataire').value.trim(),
+      signature: sig.image(),
+      emailClient: $('emailClient').value.trim(),
+      envoyerClient: $('envoyerClient').checked
+    };
+
+    donnees.idLocal = 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    var b = $('valider'); b.disabled = true;
+    fileAjouter({ idLocal: donnees.idLocal, client: nomClient, creeLe: Date.now(), donnees: donnees })
+      .then(function () {
+        b.disabled = false;
+        message('Fiche enregistrée sur le téléphone. ' + (navigator.onLine
+          ? 'Envoi en cours, vous pouvez commencer la fiche suivante.'
+          : 'Elle partira toute seule dès que le réseau revient (gardez la page ouverte).'), 'ok');
+        effacerBrouillon();
+        reinitialiser();
+        traiterFile();
+      })
+      .catch(function () {
+        // Stockage impossible sur ce téléphone : envoi direct
+        b.textContent = 'Envoi en cours…';
+        appelServeur('fiche', codeAcces, donnees)
+          .then(function (r) {
+            b.disabled = false; b.textContent = 'Valider la fiche';
+            message('Fiche ' + r.id + ' enregistrée.', 'ok');
+            effacerBrouillon(); reinitialiser();
+          })
+          .catch(function (err) {
+            b.disabled = false; b.textContent = 'Valider la fiche';
+            message('Erreur : ' + err.message + ". La fiche n'a pas été enregistrée, réessayez.", 'err');
+          });
+      });
+  };
+
+  /* ---------- File d'attente : envoi automatique quand le réseau revient ---------- */
+  var BASE = 'kivoitoo_fiches', TABLE = 'attente';
+  function ouvrirBase() {
+    return new Promise(function (ok, ko) {
+      try {
+        var req = indexedDB.open(BASE, 1);
+        req.onupgradeneeded = function () { req.result.createObjectStore(TABLE, { keyPath: 'idLocal' }); };
+        req.onsuccess = function () { ok(req.result); };
+        req.onerror = function () { ko(req.error); };
+      } catch (e) { ko(e); }
+    });
+  }
+  function operation(mode, action) {
+    return ouvrirBase().then(function (db) {
+      return new Promise(function (ok, ko) {
+        var tx = db.transaction(TABLE, mode);
+        var req = action(tx.objectStore(TABLE));
+        tx.oncomplete = function () { ok(req ? req.result : null); };
+        tx.onerror = function () { ko(tx.error); };
+        tx.onabort = function () { ko(tx.error); };
+      });
+    });
+  }
+  function fileAjouter(f) { return operation('readwrite', function (t) { return t.put(f); }); }
+  function fileSupprimer(id) { return operation('readwrite', function (t) { return t.delete(id); }); }
+  function fileLister() { return operation('readonly', function (t) { return t.getAll(); }); }
+
+  function bandeau(txt) {
+    $('bandeau').style.display = txt ? 'flex' : 'none';
+    $('bandeauTxt').textContent = txt || '';
+  }
+
+  var envoiEnCours = false;
+  function traiterFile() {
+    if (envoiEnCours) return;
+    envoiEnCours = true;   // posé tout de suite : deux déclenchements simultanés n'envoient pas deux fois
+    fileLister().then(function (liste) {
+      liste = (liste || []).sort(function (a, b) { return a.creeLe - b.creeLe; });
+      if (!liste.length) { envoiEnCours = false; bandeau(''); return; }
+      var n = liste.length, s = n > 1 ? 's' : '';
+      if (!navigator.onLine) { envoiEnCours = false; bandeau(n + ' fiche' + s + ' en attente : envoi dès que le réseau revient'); return; }
+      bandeau('Envoi en cours… (' + n + ' fiche' + s + ' en attente)');
+      var f = liste[0];
+      appelServeur('fiche', codeAcces || memoire('codeAcces'), f.donnees)
+        .then(function (r) {
+          fileSupprimer(f.idLocal).then(function () {
+            envoiEnCours = false;
+            message('Fiche ' + r.id + ' envoyée (' + f.client + ').', 'ok');
+            traiterFile();
+          });
+        })
+        .catch(function (err) {
+          envoiEnCours = false;
+          if (err.serveur && /code/i.test(err.message)) { $('ecranCode').classList.remove('cache'); }
+          bandeau(n + ' fiche' + s + ' en attente : nouvel essai automatique');
+        });
+    }).catch(function () { envoiEnCours = false; });
+  }
+  $('btnRenvoyer').onclick = traiterFile;
+  window.addEventListener('online', traiterFile);
+  window.addEventListener('offline', traiterFile);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') traiterFile(); });
+  setInterval(traiterFile, 30000);
+
+  /* ---------- Brouillon : la fiche en cours est gardée si la page se ferme ---------- */
+  var CHAMPS = ['date', 'client', 'adresse', 'codeTransmetteur', 'type', 'autreType', 'dosIntervention', 'dosFacturation',
+    'heureArrivee', 'travaux', 'materiel', 'simRemplacee', 'pilesRemplacees', 'refAncienne', 'refSim', 'remarqueSim',
+    'signataire', 'emailClient', 'envoyerClient'];
+  function sauverBrouillon() {
+    var b = {};
+    CHAMPS.forEach(function (id) { var e = $(id); if (e) b[id] = (e.type === 'checkbox' || e.type === 'radio') ? e.checked : e.value; });
+    memoire('brouillon', JSON.stringify(b));
+  }
+  function effacerBrouillon() { memoire('brouillon', ''); }
+  function restaurerBrouillon() {
+    try {
+      var b = JSON.parse(memoire('brouillon') || 'null');
+      if (!b || !(b.client || b.travaux || b.signataire || b.refSim)) return;
+      CHAMPS.forEach(function (id) { var e = $(id); if (e && b[id] !== undefined) { if (e.type === 'checkbox' || e.type === 'radio') e.checked = b[id]; else e.value = b[id]; } });
+      $('blocSim').classList.toggle('cache', !$('simRemplacee').checked);
+      modeAutre($('type').value === 'Autre');
+      $('blocPiles').classList.toggle('cache', !$('pilesRemplacees').checked);
+      message('Fiche en cours restaurée (photos et signature à refaire).', 'ok');
+    } catch (e) { /* pas de brouillon */ }
+  }
+  $('fiche').addEventListener('input', sauverBrouillon);
+  $('fiche').addEventListener('change', sauverBrouillon);
+
+  /* ---------- Démarrage ---------- */
+  $('ecranCode').classList.add('cache');
+  try {
+    var enMemoire = JSON.parse(memoire('listes') || 'null');
+    if (enMemoire) { listes = enMemoire; remplirListes(); }
+  } catch (e) { /* rien en mémoire */ }
+  $('fiche').classList.remove('cache');
+  remplirPiles();
+  initFiche();
+  restaurerBrouillon();
+  codeAcces = memoire('codeAcces') || '';
+  connecter(codeAcces);
+  traiterFile();
+
+  /* ---------- Appli installable : fonctionne même sans réseau ---------- */
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  }
+</script>
+</body>
+</html>
