@@ -1,6 +1,6 @@
 /* Fiche intervention Kivoitoo : garde l'appli dans le téléphone pour l'ouvrir même sans réseau.
    Ouverture instantanée depuis la mémoire, puis mise à jour discrète en arrière-plan. */
-const VERSION = 'fiche-v4';
+const VERSION = 'fiche-v5';
 const FICHIERS = ['./', 'index.html', 'manifest.webmanifest', 'logo.png', 'icone-180.png', 'icone-192.png', 'icone-512.png'];
 
 self.addEventListener('install', e => {
