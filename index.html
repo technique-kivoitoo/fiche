@@ -38,6 +38,9 @@
   textarea { min-height: 80px; resize: vertical; }
   .ligne { display: flex; gap: 10px; }
   .ligne > div { flex: 1; min-width: 0; }
+  /* iPhone : les champs date et heure gardent sinon une largeur fixe et débordent sur le champ voisin */
+  input[type=date], input[type=time] { -webkit-appearance: none; appearance: none; display: block; min-width: 0; max-width: 100%; width: 100%; min-height: 44px; background: #fff; }
+  input::-webkit-date-and-time-value { text-align: left; }
   .btn { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--bleu); background: #fff; color: var(--bleu); font-size: 15px; cursor: pointer; white-space: nowrap; }
   .btn-plein { background: var(--bleu); color: #fff; width: 100%; padding: 14px; font-size: 17px; border: none; border-radius: 10px; margin-top: 12px; cursor: pointer; }
   .btn-plein:disabled { opacity: .6; }
