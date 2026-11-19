@@ -29,6 +29,9 @@
   #histo .meta { color: #666; font-size: 12px; margin-top: 2px; }
   #histo .ok { color: #2e7d32; font-weight: bold; background: none; padding: 0; border: 0; }
   #histo .att { color: #d32f2f; font-weight: bold; }
+  #histo .voir { display: inline-block; margin-top: 6px; padding: 6px 10px; font-size: 13px; }
+  #modif { background: #fff4d6; color: #7a5200; border: 1px solid #f0d58a; }
+  #modif .btn { margin-top: 8px; }
   #histo .vide { padding: 14px; color: #888; font-size: 14px; }
   main { padding: 12px 16px 40px; max-width: 640px; margin: auto; }
   .carte { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
@@ -85,6 +88,11 @@
 
   <!-- Fiche -->
   <form id="fiche" class="cache" autocomplete="off" novalidate>
+    <div id="modif" class="carte cache">
+      <b>Modification de la fiche <span id="modifRef"></span></b>
+      <div style="font-size:14px;margin-top:4px">Corrigez ce qu'il faut puis touchez « Renvoyer la fiche corrigée ». Une nouvelle fiche part à Joaquim (et dans Dolibarr) avec la mention « correction », l'ancienne n'est pas effacée.</div>
+      <button type="button" class="btn" id="annulerModif">Annuler la modification</button>
+    </div>
     <div class="carte">
       <h2>Intervention</h2>
       <div class="ligne">
@@ -379,6 +387,12 @@
     });
     return {
       effacer: taille,
+      charger: function (url) {
+        taille();
+        var img = new Image();
+        img.onload = function () { var r = cv.getBoundingClientRect(); ctx.drawImage(img, 0, 0, r.width, r.height); vide = false; };
+        img.src = url;
+      },
       estVide: function () { return vide; },
       image: function () {
         var out = document.createElement('canvas'); out.width = cv.width; out.height = cv.height;
@@ -407,6 +421,7 @@
     photos = []; photoSim = ''; photoSimNouvelle = '';
     $('vignetteSim').innerHTML = ''; $('vignetteSimNouvelle').innerHTML = '';
     $('blocSim').classList.add('cache'); $('blocPiles').classList.add('cache'); modeAutre(false); clientChoisi = null;
+    modeModif(null);
     initFiche();
   }
 
@@ -456,10 +471,13 @@
     };
 
     donnees.idLocal = 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    if (modification) donnees.corrige = modification.ref;
     demanderPastille();
     var b = $('valider'); b.disabled = true;
-    histoAjouter({ idLocal: donnees.idLocal, client: nomClient, type: donnees.type, date: donnees.date, creeLe: Date.now(), statut: 'attente' });
-    fileAjouter({ idLocal: donnees.idLocal, client: nomClient, creeLe: Date.now(), donnees: donnees })
+    histoAjouter({ idLocal: donnees.idLocal, client: nomClient, type: donnees.type, date: donnees.date, creeLe: Date.now(), statut: 'attente', corrige: donnees.corrige || '' });
+    archiveAjouter({ idLocal: donnees.idLocal, creeLe: Date.now(), donnees: donnees })
+      .catch(function () { /* copie impossible : la fiche part quand même */ })
+      .then(function () { return fileAjouter({ idLocal: donnees.idLocal, client: nomClient, creeLe: Date.now(), donnees: donnees }); })
       .then(function () {
         b.disabled = false;
         message('Fiche enregistrée sur le téléphone. ' + (navigator.onLine
@@ -487,22 +505,26 @@
   };
 
   /* ---------- File d'attente : envoi automatique quand le réseau revient ---------- */
-  var BASE = 'kivoitoo_fiches', TABLE = 'attente';
+  var BASE = 'kivoitoo_fiches', TABLE = 'attente', ARCHIVE = 'archive';
   function ouvrirBase() {
     return new Promise(function (ok, ko) {
       try {
-        var req = indexedDB.open(BASE, 1);
-        req.onupgradeneeded = function () { req.result.createObjectStore(TABLE, { keyPath: 'idLocal' }); };
+        var req = indexedDB.open(BASE, 2);
+        req.onupgradeneeded = function () {
+          var db = req.result;
+          if (!db.objectStoreNames.contains(TABLE)) db.createObjectStore(TABLE, { keyPath: 'idLocal' });
+          if (!db.objectStoreNames.contains(ARCHIVE)) db.createObjectStore(ARCHIVE, { keyPath: 'idLocal' });
+        };
         req.onsuccess = function () { ok(req.result); };
         req.onerror = function () { ko(req.error); };
       } catch (e) { ko(e); }
     });
   }
-  function operation(mode, action) {
+  function operation(mode, action, table) {
     return ouvrirBase().then(function (db) {
       return new Promise(function (ok, ko) {
-        var tx = db.transaction(TABLE, mode);
-        var req = action(tx.objectStore(TABLE));
+        var tx = db.transaction(table || TABLE, mode);
+        var req = action(tx.objectStore(table || TABLE));
         tx.oncomplete = function () { ok(req ? req.result : null); };
         tx.onerror = function () { ko(tx.error); };
         tx.onabort = function () { ko(tx.error); };
@@ -512,6 +534,18 @@
   function fileAjouter(f) { return operation('readwrite', function (t) { return t.put(f); }); }
   function fileSupprimer(id) { return operation('readwrite', function (t) { return t.delete(id); }); }
   function fileLister() { return operation('readonly', function (t) { return t.getAll(); }); }
+  // Copie complète des 20 dernières fiches (photos et signature comprises) pour pouvoir les revoir et les corriger
+  function archiveLire(id) { return operation('readonly', function (t) { return t.get(id); }, ARCHIVE); }
+  function archiveAjouter(f) {
+    var garder = {};
+    histoLire().forEach(function (x) { garder[x.idLocal] = true; });
+    return operation('readwrite', function (t) {
+      t.put(f);
+      var req = t.getAllKeys();
+      req.onsuccess = function () { req.result.forEach(function (k) { if (k !== f.idLocal && !garder[k]) t.delete(k); }); };
+      return req;
+    }, ARCHIVE);
+  }
 
   function bandeau(txt) {
     $('bandeau').style.display = txt ? 'flex' : 'none';
@@ -540,11 +574,74 @@
         '<div class="meta">' + echapper(x.type || '') + ' · faite le ' + dateCourte(x.creeLe) + '</div>' +
         '<div class="meta">' + (x.statut === 'envoyee'
           ? '<span class="ok">✓ Envoyée</span> · ' + echapper(x.ref || '') + (x.envoyeLe ? ' · ' + dateCourte(x.envoyeLe) : '')
-          : '<span class="att">⏳ En attente d’envoi</span>') + '</div></div>';
+          : '<span class="att">⏳ En attente d’envoi</span>') + '</div>' +
+        (x.corrige ? '<div class="meta">Correction de ' + echapper(x.corrige) + '</div>' : '') +
+        (x.statut === 'envoyee' ? '<button type="button" class="btn voir" data-id="' + echapper(x.idLocal) + '">Voir / modifier</button>' : '') +
+        '</div>';
     });
     $('histo').innerHTML = html;
   }
   function echapper(t) { return String(t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  $('histo').addEventListener('click', function (e) {
+    var bt = e.target.closest && e.target.closest('.voir'); if (!bt) return;
+    $('histo').classList.add('cache');
+    ouvrirFiche(bt.getAttribute('data-id'));
+  });
+
+  /* ---------- Revoir / corriger une fiche envoyée ---------- */
+  var modification = null;   // { ref, idLocal } quand on corrige une fiche déjà envoyée
+  function modeModif(m) {
+    modification = m;
+    memoire('modif', m ? JSON.stringify(m) : '');
+    $('modif').classList.toggle('cache', !m);
+    $('modifRef').textContent = m ? m.ref + ' (' + m.client + ')' : '';
+    $('valider').textContent = m ? 'Renvoyer la fiche corrigée' : 'Valider la fiche';
+  }
+  $('annulerModif').onclick = function () { effacerBrouillon(); reinitialiser(); cacherMessage(); };
+  function ouvrirFiche(idLocal, garderChamps) {
+    var x = histoLire().filter(function (h) { return h.idLocal === idLocal; })[0];
+    return archiveLire(idLocal).then(function (a) {
+      if (!a || !a.donnees) {
+        message('Cette fiche a été faite avant la mise à jour de l’appli : elle ne peut pas être rouverte. Seules les nouvelles fiches peuvent l’être.', 'err');
+        return;
+      }
+      var d = a.donnees;
+      reinitialiser();
+      var types = Array.prototype.map.call($('type').options, function (o) { return o.value; });
+      $('date').value = d.date || ''; $('technicien').value = d.technicien || $('technicien').value;
+      $('client').value = d.client || ''; $('adresse').value = d.adresse || ''; $('codeTransmetteur').value = d.codeTransmetteur || '';
+      if (types.indexOf(d.type) >= 0 && d.type !== 'Autre') { $('type').value = d.type; modeAutre(false); }
+      else { $('type').value = 'Autre'; modeAutre(true); $('autreType').value = d.type || ''; }
+      var fact = (d.dossiers || []).indexOf('Facturation intervention') >= 0;
+      $('dosFacturation').checked = fact; $('dosIntervention').checked = !fact;
+      $('heureArrivee').value = d.heureArrivee || ''; $('heureDepart').value = d.heureDepart || '';
+      $('travaux').value = d.travaux || ''; $('materiel').value = d.materiel || '';
+      photos = d.photos || [];
+      // Piles
+      var piles = {}; (d.piles || []).forEach(function (p) { piles[p.nom] = p.qte; });
+      $('pilesRemplacees').checked = (d.piles || []).length > 0;
+      $('blocPiles').classList.toggle('cache', !$('pilesRemplacees').checked);
+      Array.prototype.forEach.call($('listePiles').querySelectorAll('.pile'), function (r) {
+        var cb = r.querySelector('.pileCase'), q = r.querySelector('.pileQte'), n = piles[cb.getAttribute('data-nom')];
+        cb.checked = !!n; q.value = n || '';
+      });
+      // SIM
+      $('simRemplacee').checked = !!d.simRemplacee; $('blocSim').classList.toggle('cache', !d.simRemplacee);
+      $('refAncienne').value = d.refAncienne || ''; $('refSim').value = d.refSim || ''; $('remarqueSim').value = d.remarqueSim || '';
+      photoSim = d.photoSim || ''; photoSimNouvelle = d.photoSimNouvelle || '';
+      if (photoSim) vignette($('vignetteSim'), photoSim);
+      if (photoSimNouvelle) vignette($('vignetteSimNouvelle'), photoSimNouvelle);
+      // Signature et client
+      $('signataire').value = d.signataire || '';
+      if (d.signature) sig.charger(d.signature);
+      $('emailClient').value = d.emailClient || '';
+      $('envoyerClient').checked = false;   // le client ne reçoit la correction que si on recoche
+      modeModif({ ref: (x && x.ref) || d.corrige || '?', idLocal: idLocal, client: d.client || '' });
+      if (garderChamps) appliquerBrouillon(garderChamps);
+      else { sauverBrouillon(); message('Fiche ' + modification.ref + ' rouverte : vous pouvez la corriger.', 'ok'); }
+    }).catch(function () { message('Impossible de rouvrir cette fiche sur ce téléphone.', 'err'); });
+  }
+
   $('btnHisto').onclick = function (e) { e.stopPropagation(); histoAfficher(); $('histo').classList.toggle('cache'); };
   document.addEventListener('click', function (e) {
     if (!$('histo').classList.contains('cache') && !$('histo').contains(e.target)) $('histo').classList.add('cache');
@@ -609,9 +706,17 @@
     memoire('brouillon', JSON.stringify(b));
   }
   function effacerBrouillon() { memoire('brouillon', ''); }
+  function appliquerBrouillon(b) {
+    CHAMPS.forEach(function (id) { var e = $(id); if (e && b[id] !== undefined) { if (e.type === 'checkbox' || e.type === 'radio') e.checked = b[id]; else e.value = b[id]; } });
+    $('blocSim').classList.toggle('cache', !$('simRemplacee').checked);
+    modeAutre($('type').value === 'Autre');
+    $('blocPiles').classList.toggle('cache', !$('pilesRemplacees').checked);
+  }
   function restaurerBrouillon() {
     try {
       var b = JSON.parse(memoire('brouillon') || 'null');
+      var m = JSON.parse(memoire('modif') || 'null');
+      if (m && m.idLocal) { ouvrirFiche(m.idLocal, b || {}); return; }   // correction en cours : on la reprend telle quelle
       if (!b || !(b.client || b.travaux || b.signataire || b.refSim)) return;
       CHAMPS.forEach(function (id) { var e = $(id); if (e && b[id] !== undefined) { if (e.type === 'checkbox' || e.type === 'radio') e.checked = b[id]; else e.value = b[id]; } });
       $('blocSim').classList.toggle('cache', !$('simRemplacee').checked);
