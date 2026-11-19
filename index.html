@@ -288,15 +288,19 @@
     boite.innerHTML = '';
     if (!v) { boite.style.display = 'none'; return; }
     var debut = [], dedans = [];
+    // On cherche dans le nom ET dans l'autre nom Dolibarr (ex. BLISS = UNDIZ NEYRPIC)
     listes.clients.forEach(function (c) {
-      var n = simplifier(c.nom), p = n.indexOf(v);
-      if (p === 0) debut.push(c); else if (p > 0) dedans.push(c);
+      var n = simplifier(c.nom), p = n.indexOf(v), a = c.alias ? simplifier(c.alias).indexOf(v) : -1;
+      var mots = c.alias ? simplifier(c.alias).split(/\s*\/\s*/) : [];
+      if (p === 0 || mots.some(function (m) { return m.indexOf(v) === 0; })) debut.push(c);
+      else if (p > 0 || a >= 0) dedans.push(c);
     });
     var res = debut.concat(dedans).slice(0, 60);
     if (!res.length) { boite.style.display = 'none'; return; }
     res.forEach(function (c) {
       var d = document.createElement('div');
       d.textContent = c.nom;
+      if (c.alias) { var al = document.createElement('small'); al.textContent = '= ' + c.alias; al.style.color = '#1f3a68'; d.appendChild(al); }
       if (c.adresse) { var s = document.createElement('small'); s.textContent = c.adresse; d.appendChild(s); }
       d.addEventListener('pointerdown', function (e) { e.preventDefault(); });
       d.addEventListener('click', function () {
