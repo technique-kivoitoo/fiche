@@ -32,6 +32,22 @@
   #histo .voir { display: inline-block; margin-top: 6px; padding: 6px 10px; font-size: 13px; }
   #modif { background: #fff4d6; color: #7a5200; border: 1px solid #f0d58a; }
   #modif .btn { margin-top: 8px; }
+  .rdv-tete { display: flex; justify-content: space-between; align-items: center; }
+  .rdv-tete h2 { margin: 0; }
+  .rdv-tete .btn { padding: 5px 10px; font-size: 14px; }
+  .rdv-jour { font-size: 12px; font-weight: bold; color: #666; text-transform: uppercase; margin: 12px 0 4px; }
+  .rdv { border: 1px solid var(--bord); border-left: 4px solid var(--bleu); border-radius: 8px; padding: 9px 11px; margin: 6px 0; cursor: pointer; }
+  .rdv:active { background: #eef1f6; }
+  .rdv b { display: block; font-size: 15px; }
+  .rdv .h { color: var(--bleu); font-weight: bold; font-size: 13px; }
+  .rdv small { display: block; color: #666; font-size: 12px; margin-top: 2px; white-space: pre-line; }
+  .rdv.fait { opacity: .55; border-left-color: #2e7d32; }
+  .rdv.fait .h::after { content: '  ✓ fiche faite'; color: #2e7d32; }
+  #rdvInfo { font-size: 13px; color: #888; margin-top: 6px; }
+  #choixClientRdv { background: #fff4d6; border: 1px solid #f0d58a; border-radius: 8px; padding: 10px; margin-top: 10px; }
+  #choixClientRdv div.c { background: #fff; border: 1px solid var(--bord); border-radius: 8px; padding: 9px 11px; margin-top: 6px; cursor: pointer; }
+  #choixClientRdv small { display: block; color: #666; font-size: 12px; }
+  #motifRdv { background: #eef4ff; border-radius: 8px; padding: 8px 10px; font-size: 14px; margin-bottom: 8px; white-space: pre-line; }
   #histo .vide { padding: 14px; color: #888; font-size: 14px; }
   main { padding: 12px 16px 40px; max-width: 640px; margin: auto; }
   .carte { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
@@ -93,7 +109,15 @@
       <div style="font-size:14px;margin-top:4px">Corrigez ce qu'il faut puis touchez « Renvoyer la fiche corrigée ». Une nouvelle fiche part à Joaquim (et dans Dolibarr) avec la mention « correction », l'ancienne n'est pas effacée.</div>
       <button type="button" class="btn" id="annulerModif">Annuler la modification</button>
     </div>
-    <div class="carte">
+    <div class="carte" id="carteRdv">
+      <div class="rdv-tete"><h2>Mes RDV</h2><button type="button" class="btn" id="majRdv" aria-label="Actualiser les RDV">↻</button></div>
+      <div id="listeRdv"></div>
+      <div id="rdvInfo"></div>
+      <div id="choixClientRdv" class="cache"></div>
+    </div>
+
+    <div class="carte" id="carteIntervention">
+      <input type="hidden" id="rdvId"><input type="hidden" id="rdvMotif">
       <h2>Intervention</h2>
       <div class="ligne">
         <div><label for="date">Date</label><input id="date" type="date"></div>
@@ -130,6 +154,7 @@
 
     <div class="carte">
       <h2>Travaux</h2>
+      <div id="motifRdv" class="cache"></div>
       <label for="travaux">Travaux réalisés</label><textarea id="travaux"></textarea>
       <label for="materiel">Matériel</label><textarea id="materiel"></textarea>
     </div>
@@ -226,6 +251,7 @@
         $('fiche').classList.remove('cache');
         if (!ficheInit) initFiche();
         traiterFile();
+        chargerRdv(false);
       })
       .catch(function (err) {
         $('btnCode').disabled = false;
@@ -328,7 +354,7 @@
     if (this.value === 'Autre') { modeAutre(true); $('autreType').focus(); }
   };
   $('retourType').onclick = function () { $('autreType').value = ''; modeAutre(false); sauverBrouillon(); };
-  $('technicien').onchange = function () { memoire('technicien', this.value); };
+  $('technicien').onchange = function () { memoire('technicien', this.value); chargerRdv(true); };
   $('simRemplacee').onchange = function () { $('blocSim').classList.toggle('cache', !this.checked); };
   $('pilesRemplacees').onchange = function () { $('blocPiles').classList.toggle('cache', !this.checked); };
 
@@ -426,7 +452,9 @@
     $('vignetteSim').innerHTML = ''; $('vignetteSimNouvelle').innerHTML = '';
     $('blocSim').classList.add('cache'); $('blocPiles').classList.add('cache'); modeAutre(false); clientChoisi = null;
     modeModif(null);
+    $('motifRdv').classList.add('cache'); $('choixClientRdv').classList.add('cache');
     initFiche();
+    afficherRdv();
   }
 
   $('fiche').onsubmit = function (e) {
@@ -476,6 +504,7 @@
 
     donnees.idLocal = 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     if (modification) donnees.corrige = modification.ref;
+    if ($('rdvId').value) { donnees.rdv = $('rdvId').value; rdvMarquerFait($('rdvId').value); }
     demanderPastille();
     var b = $('valider'); b.disabled = true;
     histoAjouter({ idLocal: donnees.idLocal, client: nomClient, type: donnees.type, date: donnees.date, creeLe: Date.now(), statut: 'attente', corrige: donnees.corrige || '' });
@@ -592,6 +621,121 @@
     ouvrirFiche(bt.getAttribute('data-id'));
   });
 
+  /* ---------- Mes RDV : lus dans l'agenda Google du technicien (ALDO, LÉO, YOHAN) ---------- */
+  var rdvListe = [], rdvDernier = 0;
+  function aujourdhui() { var d = new Date(); return d.getFullYear() + '-' + deux(d.getMonth() + 1) + '-' + deux(d.getDate()); }
+  function rdvFaits() { try { return JSON.parse(memoire('rdvFaits') || '[]'); } catch (e) { return []; } }
+  function rdvMarquerFait(id) { var f = rdvFaits().filter(function (x) { return x !== id; }); f.unshift(id); memoire('rdvFaits', JSON.stringify(f.slice(0, 80))); }
+  function chargerRdv(force) {
+    var tech = $('technicien').value;
+    try { var c = JSON.parse(memoire('rdv_' + tech) || 'null'); rdvListe = c ? c.rdv || [] : []; $('rdvInfo').textContent = c && c.maj ? 'Agenda lu le ' + c.maj : ''; } catch (e) { rdvListe = []; }
+    afficherRdv();
+    if (!tech || !navigator.onLine || !(codeAcces || memoire('codeAcces'))) return;
+    if (!force && Date.now() - rdvDernier < 5 * 60000) return;
+    rdvDernier = Date.now();
+    appelServeur('rdv', codeAcces || memoire('codeAcces'), { technicien: tech })
+      .then(function (r) {
+        if ($('technicien').value !== tech) return;
+        if (r.erreur) { $('rdvInfo').textContent = r.erreur; return; }
+        memoire('rdv_' + tech, JSON.stringify(r));
+        rdvListe = r.rdv || []; $('rdvInfo').textContent = 'Agenda lu le ' + r.maj;
+        afficherRdv();
+      })
+      .catch(function () { if (!rdvListe.length) $('rdvInfo').textContent = 'RDV indisponibles pour l’instant.'; });
+  }
+  $('majRdv').onclick = function () { chargerRdv(true); };
+  function nomJour(d) {
+    var auj = aujourdhui(), dem = new Date(); dem.setDate(dem.getDate() + 1);
+    if (d === auj) return 'Aujourd’hui';
+    if (d === dem.getFullYear() + '-' + deux(dem.getMonth() + 1) + '-' + deux(dem.getDate())) return 'Demain';
+    var x = new Date(d + 'T12:00:00');
+    return ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'][x.getDay()] + ' ' + deux(x.getDate()) + '/' + deux(x.getMonth() + 1);
+  }
+  function afficherRdv() {
+    var l = $('listeRdv'); l.innerHTML = '';
+    if (!$('technicien').value) { l.innerHTML = '<div class="aide">Choisissez votre nom dans « Technicien » pour voir vos RDV.</div>'; return; }
+    var auj = aujourdhui(), faits = rdvFaits(), jour = '', enCours = $('rdvId').value;
+    var liste = rdvListe.filter(function (r) { return r.date >= auj; });
+    if (!liste.length) { l.innerHTML = '<div class="aide">Aucun RDV prévu aujourd’hui ni les 2 prochains jours.</div>'; return; }
+    liste.forEach(function (r) {
+      if (r.date !== jour) { jour = r.date; var j = document.createElement('div'); j.className = 'rdv-jour'; j.textContent = nomJour(r.date); l.appendChild(j); }
+      var d = document.createElement('div'); d.className = 'rdv' + (faits.indexOf(r.id) >= 0 ? ' fait' : '');
+      if (r.id === enCours) d.style.borderLeftColor = '#e65100';
+      var h = document.createElement('span'); h.className = 'h'; h.textContent = r.heure ? r.heure + (r.heureFin ? ' – ' + r.heureFin : '') : 'Journée'; d.appendChild(h);
+      var b = document.createElement('b'); b.textContent = r.titre; d.appendChild(b);
+      [r.lieu, r.description, r.avec && r.avec.length ? 'Avec ' + r.avec.join(', ') : ''].forEach(function (t) {
+        if (t) { var s = document.createElement('small'); s.textContent = t; d.appendChild(s); }
+      });
+      d.onclick = function () { utiliserRdv(r); };
+      l.appendChild(d);
+    });
+  }
+  // Clients dont le nom (ou l'autre nom Dolibarr) correspond le mieux au titre du RDV
+  var MOTS_VIDES = ['les', 'des', 'chez', 'pour', 'avec', 'changement', 'changer', 'remplacement', 'remplacer', 'centrale', 'pile', 'piles',
+    'maintenance', 'installation', 'alarme', 'code', 'sim', 'puce', 'batterie', 'camera', 'cameras', 'video', 'rdv', 'sav', 'mme', 'madame', 'monsieur', 'basse', 'devis', 'sarl', 'sas', 'sasu', 'sci', 'eurl', 'ste', 'societe', 'entreprise', 'residence', 'rue', 'avenue'];
+  function mots(t) { return simplifier(t).split(/[^a-z0-9]+/).filter(function (m) { return m.length >= 3 && MOTS_VIDES.indexOf(m) < 0; }); }
+  function clientsPourRdv(r) {
+    var cherche = mots(r.titre); if (!cherche.length) return [];
+    var cp = ((r.lieu || '').match(/\b\d{5}\b/) || [''])[0];
+    return listes.clients.map(function (c) {
+      var m = mots(c.nom + ' ' + (c.alias || '')), score = 0;
+      cherche.forEach(function (x) {
+        if (m.indexOf(x) >= 0) score += 2;
+        else if (x.length >= 4 && m.some(function (y) { return y.length >= 4 && (y.indexOf(x) === 0 || x.indexOf(y) === 0); })) score += 1;
+      });
+      if (score && cp && (c.adresse || '').indexOf(cp) >= 0) score += 1;
+      return { c: c, score: score };
+    }).filter(function (x) { return x.score > 0; })
+      .sort(function (a, b) { return b.score - a.score || a.c.nom.localeCompare(b.c.nom); }).slice(0, 6);
+  }
+  function typeDuRdv(r) {
+    var t = simplifier(r.titre + ' ' + r.description);
+    if (/(remplac|chang)\w*\s+(d.?une\s+|de\s+(la\s+)?|la\s+)?central/.test(t)) return 'Remplacement centrale';
+    if (/pile/.test(t)) return 'Changement de pile';
+    if (/\bsim\b|puce/.test(t)) return 'Remplacement SIM';
+    if (/install|\bpose\b/.test(t)) return 'Installation';
+    return 'Maintenance';
+  }
+  function afficherMotif() {
+    var m = $('rdvMotif').value;
+    $('motifRdv').textContent = m ? 'Motif du RDV : ' + m : '';
+    $('motifRdv').classList.toggle('cache', !m);
+  }
+  function prendreClient(c, r) {
+    $('client').value = c.nom; choisirClient(c);
+    if (!$('adresse').value && r.lieu) $('adresse').value = r.lieu;
+    $('choixClientRdv').classList.add('cache'); sauverBrouillon();
+  }
+  function utiliserRdv(r) {
+    if (r.id === $('rdvId').value) { $('carteIntervention').scrollIntoView({ behavior: 'smooth' }); return; }
+    if (($('client').value.trim() || $('travaux').value.trim()) && !confirm('Remplacer la fiche en cours par le RDV « ' + r.titre + ' » ?')) return;
+    effacerBrouillon(); reinitialiser(); cacherMessage();
+    if (r.date) $('date').value = r.date;
+    $('heureArrivee').value = r.heure || heureMaintenant();
+    var type = typeDuRdv(r); $('type').value = type;
+    if (/pile/.test(simplifier(r.titre + ' ' + r.description))) { $('pilesRemplacees').checked = true; $('blocPiles').classList.remove('cache'); }
+    $('rdvId').value = r.id;
+    $('rdvMotif').value = [r.titre, r.description].filter(Boolean).join(' — ');
+    afficherMotif();
+    var cands = clientsPourRdv(r);
+    var sur = cands.length && cands[0].score >= 2 && (cands.length === 1 || cands[1].score < cands[0].score);
+    if (sur) prendreClient(cands[0].c, r);
+    else {
+      $('client').value = ''; $('adresse').value = r.lieu || '';
+      var b = $('choixClientRdv'); b.innerHTML = '';
+      var t = document.createElement('b'); t.textContent = cands.length ? 'Quel client pour « ' + r.titre + ' » ?' : 'Client « ' + r.titre + ' » non trouvé : tapez son nom dans « Client ».'; b.appendChild(t);
+      cands.forEach(function (x) {
+        var d = document.createElement('div'); d.className = 'c'; d.textContent = x.c.nom;
+        var s = document.createElement('small'); s.textContent = [x.c.alias ? '= ' + x.c.alias : '', x.c.adresse].filter(Boolean).join(' · '); d.appendChild(s);
+        d.onclick = function () { prendreClient(x.c, r); $('carteIntervention').scrollIntoView({ behavior: 'smooth' }); };
+        b.appendChild(d);
+      });
+      b.classList.remove('cache');
+    }
+    sauverBrouillon(); afficherRdv();
+    if (sur) $('carteIntervention').scrollIntoView({ behavior: 'smooth' });
+  }
+
   /* ---------- Revoir / corriger une fiche envoyée ---------- */
   var modification = null;   // { ref, idLocal } quand on corrige une fiche déjà envoyée
   function modeModif(m) {
@@ -697,13 +841,13 @@
   $('btnRenvoyer').onclick = traiterFile;
   window.addEventListener('online', traiterFile);
   window.addEventListener('offline', traiterFile);
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') traiterFile(); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { traiterFile(); chargerRdv(false); } });
   setInterval(traiterFile, 30000);
 
   /* ---------- Brouillon : la fiche en cours est gardée si la page se ferme ---------- */
   var CHAMPS = ['date', 'client', 'adresse', 'codeTransmetteur', 'type', 'autreType', 'dosIntervention', 'dosFacturation',
     'heureArrivee', 'travaux', 'materiel', 'simRemplacee', 'pilesRemplacees', 'refAncienne', 'refSim', 'remarqueSim',
-    'signataire', 'emailClient', 'envoyerClient'];
+    'signataire', 'emailClient', 'envoyerClient', 'rdvId', 'rdvMotif'];
   function sauverBrouillon() {
     var b = {};
     CHAMPS.forEach(function (id) { var e = $(id); if (e) b[id] = (e.type === 'checkbox' || e.type === 'radio') ? e.checked : e.value; });
@@ -726,6 +870,7 @@
       $('blocSim').classList.toggle('cache', !$('simRemplacee').checked);
       modeAutre($('type').value === 'Autre');
       $('blocPiles').classList.toggle('cache', !$('pilesRemplacees').checked);
+      afficherMotif();
       message('Fiche en cours restaurée (photos et signature à refaire).', 'ok');
     } catch (e) { /* pas de brouillon */ }
   }
@@ -743,6 +888,7 @@
   initFiche();
   restaurerBrouillon();
   codeAcces = memoire('codeAcces') || '';
+  chargerRdv(false);
   connecter(codeAcces);
   traiterFile();
 
