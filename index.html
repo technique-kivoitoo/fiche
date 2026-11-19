@@ -44,10 +44,28 @@
   .rdv.fait { opacity: .55; border-left-color: #2e7d32; }
   .rdv.fait .h::after { content: '  ✓ fiche faite'; color: #2e7d32; }
   #rdvInfo { font-size: 13px; color: #888; margin-top: 6px; }
-  #choixClientRdv { background: #fff4d6; border: 1px solid #f0d58a; border-radius: 8px; padding: 10px; margin-top: 10px; }
+  #choixClientRdv { background: #fff4d6; border: 1px solid #f0d58a; border-radius: 8px; padding: 10px; margin-bottom: 12px; }
   #choixClientRdv div.c { background: #fff; border: 1px solid var(--bord); border-radius: 8px; padding: 9px 11px; margin-top: 6px; cursor: pointer; }
   #choixClientRdv small { display: block; color: #666; font-size: 12px; }
   #motifRdv { background: #eef4ff; border-radius: 8px; padding: 8px 10px; font-size: 14px; margin-bottom: 8px; white-space: pre-line; }
+  #histo .choix { display: flex; justify-content: space-between; align-items: center; width: 100%; background: #f6f8fb; border: 0; border-bottom: 1px solid #e3e8f0; border-radius: 0; padding: 13px 14px; font-size: 15px; font-weight: bold; color: var(--bleu); text-align: left; margin: 0; }
+  #histo .choix .fl { transition: transform .2s; }
+  #histo .choix.ouvert .fl { transform: rotate(90deg); }
+  #histo .choix .nbf { background: #d32f2f; color: #fff; border-radius: 10px; font-size: 11px; padding: 1px 6px; margin-left: 6px; }
+  #histo .choix .btn { padding: 4px 10px; font-size: 14px; margin: 0; }
+  #joursRdv { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 10px 14px 4px; }
+  .jour { display: flex; justify-content: space-between; align-items: center; width: 100%; background: #fff; border: 1px solid var(--bord); border-left: 4px solid var(--bleu); border-radius: 8px; padding: 11px 12px; font-size: 15px; color: #222; margin: 0; text-align: left; }
+  .jour .n { font-size: 13px; color: var(--bleu); font-weight: bold; }
+  .jour.vide { border-left-color: #ccc; color: #888; }
+  .jour.vide .n { color: #aaa; font-weight: normal; }
+  #histo #rdvInfo { padding: 2px 14px 12px; margin: 0; font-size: 12px; }
+  #histo .aide { padding: 4px 0; }
+  #fenetreRdv { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 60; display: flex; align-items: flex-end; justify-content: center; }
+  #fenetreRdv.cache { display: none; }
+  #fenetreRdv .boite { background: #fff; width: 100%; max-width: 520px; max-height: 80vh; overflow-y: auto; border-radius: 14px 14px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); }
+  #fenetreRdv .titre { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  #fenetreRdv .titre b { font-size: 17px; color: var(--bleu); }
+  #fenetreRdv .titre button { background: none; border: 0; font-size: 26px; line-height: 1; color: #666; padding: 0 4px; margin: 0; }
   #histo .vide { padding: 14px; color: #888; font-size: 14px; }
   main { padding: 12px 16px 40px; max-width: 640px; margin: auto; }
   .carte { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
@@ -88,8 +106,18 @@
 </style>
 </head>
 <body>
-<header><div class="gauche"><button id="btnHisto" type="button" aria-label="Mes dernières fiches">☰<span class="nb" id="nbAttente"></span></button><img id="logo" alt="Kivoitoo" src="logo.png" style="display:block"></div><span class="nom">Fiche d'intervention</span></header>
-<div id="histo" class="cache"></div>
+<header><div class="gauche"><button id="btnHisto" type="button" aria-label="Menu : mes fiches et mes interventions">☰<span class="nb" id="nbAttente"></span></button><img id="logo" alt="Kivoitoo" src="logo.png" style="display:block"></div><span class="nom">Fiche d'intervention</span></header>
+<div id="histo" class="cache">
+  <button type="button" class="choix" id="choixFiches"><span>📄 Mes fiches envoyées<span class="nbf" id="nbAttenteMenu"></span></span><span class="fl">›</span></button>
+  <div id="listeFiches" class="cache"></div>
+  <div class="choix"><span>📅 Interventions prévues</span><button type="button" class="btn" id="majRdv" aria-label="Actualiser les RDV">↻</button></div>
+  <div id="joursRdv"></div>
+  <div id="rdvInfo"></div>
+</div>
+<div id="fenetreRdv" class="cache"><div class="boite">
+  <div class="titre"><b id="fenetreTitre"></b><button type="button" id="fermerFenetre" aria-label="Fermer">×</button></div>
+  <div id="listeRdv"></div>
+</div></div>
 <div id="bandeau" class="bandeau"><span id="bandeauTxt"></span><button type="button" class="btn" id="btnRenvoyer">Envoyer maintenant</button></div>
 <main>
   <div id="msg" class="msg"></div>
@@ -109,15 +137,9 @@
       <div style="font-size:14px;margin-top:4px">Corrigez ce qu'il faut puis touchez « Renvoyer la fiche corrigée ». Une nouvelle fiche part à Joaquim (et dans Dolibarr) avec la mention « correction », l'ancienne n'est pas effacée.</div>
       <button type="button" class="btn" id="annulerModif">Annuler la modification</button>
     </div>
-    <div class="carte" id="carteRdv">
-      <div class="rdv-tete"><h2>Mes RDV</h2><button type="button" class="btn" id="majRdv" aria-label="Actualiser les RDV">↻</button></div>
-      <div id="listeRdv"></div>
-      <div id="rdvInfo"></div>
-      <div id="choixClientRdv" class="cache"></div>
-    </div>
-
     <div class="carte" id="carteIntervention">
       <input type="hidden" id="rdvId"><input type="hidden" id="rdvMotif">
+      <div id="choixClientRdv" class="cache"></div>
       <h2>Intervention</h2>
       <div class="ligne">
         <div><label for="date">Date</label><input id="date" type="date"></div>
@@ -187,6 +209,7 @@
 
     <div class="carte">
       <h2>Signature du client</h2>
+      <div class="aide">Facultative : si le client n'est pas sur place, laissez vide, la fiche indiquera « Client absent ».</div>
       <label for="signataire">Nom du signataire</label><input id="signataire">
       <label>Signature</label>
       <canvas id="sig"></canvas>
@@ -466,8 +489,6 @@
     if (!$('technicien').value) manque.push('le technicien');
     if (!nomClient) manque.push('le client');
     if (sim && !$('refSim').value.trim()) manque.push('la référence de la nouvelle SIM');
-    if (!$('signataire').value.trim()) manque.push('le nom du signataire');
-    if (sig.estVide()) manque.push('la signature du client');
     if ($('type').value === 'Autre' && !$('autreType').value.trim()) manque.push("le type d'intervention");
     if ($('pilesRemplacees').checked && !pilesChoisies().length) manque.push('les piles remplacées et leur nombre');
     if (!$('dosIntervention').checked && !$('dosFacturation').checked) manque.push('le dossier (Intervention appli ou Facturation intervention)');
@@ -497,7 +518,7 @@
       photoSim: sim ? photoSim : '',
       photoSimNouvelle: sim ? photoSimNouvelle : '',
       signataire: $('signataire').value.trim(),
-      signature: sig.image(),
+      signature: sig.estVide() ? '' : sig.image(),
       emailClient: $('emailClient').value.trim(),
       envoyerClient: $('envoyerClient').checked
     };
@@ -600,7 +621,8 @@
   function histoAfficher() {
     var h = histoLire(), att = h.filter(function (x) { return x.statut !== 'envoyee'; }).length;
     var nb = $('nbAttente'); nb.textContent = att; nb.style.display = att ? 'block' : 'none';
-    var html = '<h3>Mes 20 dernières fiches</h3>';
+    $('nbAttenteMenu').textContent = att ? att + ' en attente' : ''; $('nbAttenteMenu').style.display = att ? 'inline' : 'none';
+    var html = '<div class="meta" style="padding:8px 14px">Les 20 dernières fiches de ce téléphone</div>';
     if (!h.length) html += '<div class="vide">Aucune fiche faite sur ce téléphone pour l’instant.</div>';
     h.forEach(function (x) {
       html += '<div class="ligne"><b>' + echapper(x.client || '?') + '</b>' +
@@ -612,8 +634,12 @@
         (x.statut === 'envoyee' ? '<button type="button" class="btn voir" data-id="' + echapper(x.idLocal) + '">Voir / modifier</button>' : '') +
         '</div>';
     });
-    $('histo').innerHTML = html;
+    $('listeFiches').innerHTML = html;
   }
+  $('choixFiches').onclick = function () {
+    var ouvert = $('listeFiches').classList.toggle('cache') === false;
+    this.classList.toggle('ouvert', ouvert);
+  };
   function echapper(t) { return String(t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   $('histo').addEventListener('click', function (e) {
     var bt = e.target.closest && e.target.closest('.voir'); if (!bt) return;
@@ -643,7 +669,7 @@
       })
       .catch(function () { if (!rdvListe.length) $('rdvInfo').textContent = 'RDV indisponibles pour l’instant.'; });
   }
-  $('majRdv').onclick = function () { chargerRdv(true); };
+  $('majRdv').onclick = function (e) { e.stopPropagation(); chargerRdv(true); };
   function nomJour(d) {
     var auj = aujourdhui(), dem = new Date(); dem.setDate(dem.getDate() + 1);
     if (d === auj) return 'Aujourd’hui';
@@ -651,14 +677,41 @@
     var x = new Date(d + 'T12:00:00');
     return ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'][x.getDay()] + ' ' + deux(x.getDate()) + '/' + deux(x.getMonth() + 1);
   }
+  // Menu ☰ : un bouton par jour (aujourd'hui + 4 jours), qui ouvre la fenêtre des interventions du jour
+  function cinqJours() {
+    var j = [];
+    for (var i = 0; i < 5; i++) { var d = new Date(); d.setDate(d.getDate() + i); j.push(d.getFullYear() + '-' + deux(d.getMonth() + 1) + '-' + deux(d.getDate())); }
+    return j;
+  }
+  var jourOuvert = '';
   function afficherRdv() {
+    var z = $('joursRdv'); z.innerHTML = '';
+    if (!$('technicien').value) { z.innerHTML = '<div class="aide">Choisissez votre nom dans « Technicien » (sur la fiche) pour voir vos interventions.</div>'; return; }
+    var faits = rdvFaits();
+    cinqJours().forEach(function (jour) {
+      var du = rdvListe.filter(function (r) { return r.date === jour; });
+      var reste = du.filter(function (r) { return faits.indexOf(r.id) < 0; }).length;
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'jour' + (du.length ? '' : ' vide');
+      var t = document.createElement('span'); t.textContent = nomJour(jour); b.appendChild(t);
+      var n = document.createElement('span'); n.className = 'n';
+      n.textContent = du.length ? du.length + ' inter' + (du.length > 1 ? 's' : '') + (du.length > reste ? ' (' + (du.length - reste) + ' faite' + (du.length - reste > 1 ? 's' : '') + ')' : '') : 'aucune';
+      b.appendChild(n);
+      b.onclick = function (e) { e.stopPropagation(); ouvrirJour(jour); };
+      z.appendChild(b);
+    });
+    if (jourOuvert) remplirJour(jourOuvert);
+  }
+  function ouvrirJour(jour) { jourOuvert = jour; remplirJour(jour); $('fenetreRdv').classList.remove('cache'); }
+  function fermerJour() { jourOuvert = ''; $('fenetreRdv').classList.add('cache'); }
+  $('fermerFenetre').onclick = fermerJour;
+  $('fenetreRdv').addEventListener('click', function (e) { if (e.target === this) fermerJour(); });
+  function remplirJour(jour) {
+    $('fenetreTitre').textContent = nomJour(jour);
     var l = $('listeRdv'); l.innerHTML = '';
-    if (!$('technicien').value) { l.innerHTML = '<div class="aide">Choisissez votre nom dans « Technicien » pour voir vos RDV.</div>'; return; }
-    var auj = aujourdhui(), faits = rdvFaits(), jour = '', enCours = $('rdvId').value;
-    var liste = rdvListe.filter(function (r) { return r.date >= auj; });
-    if (!liste.length) { l.innerHTML = '<div class="aide">Aucun RDV prévu aujourd’hui ni les 2 prochains jours.</div>'; return; }
+    var faits = rdvFaits(), enCours = $('rdvId').value;
+    var liste = rdvListe.filter(function (r) { return r.date === jour; });
+    if (!liste.length) { l.innerHTML = '<div class="aide">Aucune intervention prévue ce jour-là.</div>'; return; }
     liste.forEach(function (r) {
-      if (r.date !== jour) { jour = r.date; var j = document.createElement('div'); j.className = 'rdv-jour'; j.textContent = nomJour(r.date); l.appendChild(j); }
       var d = document.createElement('div'); d.className = 'rdv' + (faits.indexOf(r.id) >= 0 ? ' fait' : '');
       if (r.id === enCours) d.style.borderLeftColor = '#e65100';
       var h = document.createElement('span'); h.className = 'h'; h.textContent = r.heure ? r.heure + (r.heureFin ? ' – ' + r.heureFin : '') : 'Journée'; d.appendChild(h);
@@ -666,7 +719,7 @@
       [r.lieu, r.description, r.avec && r.avec.length ? 'Avec ' + r.avec.join(', ') : ''].forEach(function (t) {
         if (t) { var s = document.createElement('small'); s.textContent = t; d.appendChild(s); }
       });
-      d.onclick = function () { utiliserRdv(r); };
+      d.onclick = function () { fermerJour(); $('histo').classList.add('cache'); utiliserRdv(r); };
       l.appendChild(d);
     });
   }
@@ -733,7 +786,7 @@
       b.classList.remove('cache');
     }
     sauverBrouillon(); afficherRdv();
-    if (sur) $('carteIntervention').scrollIntoView({ behavior: 'smooth' });
+    $('carteIntervention').scrollIntoView({ behavior: 'smooth' });
   }
 
   /* ---------- Revoir / corriger une fiche envoyée ---------- */
@@ -790,9 +843,9 @@
     }).catch(function () { message('Impossible de rouvrir cette fiche sur ce téléphone.', 'err'); });
   }
 
-  $('btnHisto').onclick = function (e) { e.stopPropagation(); histoAfficher(); $('histo').classList.toggle('cache'); };
+  $('btnHisto').onclick = function (e) { e.stopPropagation(); histoAfficher(); afficherRdv(); $('histo').classList.toggle('cache'); if (!$('histo').classList.contains('cache')) chargerRdv(false); };
   document.addEventListener('click', function (e) {
-    if (!$('histo').classList.contains('cache') && !$('histo').contains(e.target)) $('histo').classList.add('cache');
+    if (!$('histo').classList.contains('cache') && !$('histo').contains(e.target) && !$('fenetreRdv').contains(e.target)) $('histo').classList.add('cache');
   });
   histoAfficher();
 
