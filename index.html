@@ -113,6 +113,7 @@
   <div class="choix"><span>📅 Interventions prévues</span><button type="button" class="btn" id="majRdv" aria-label="Actualiser les RDV">↻</button></div>
   <div id="joursRdv"></div>
   <div id="rdvInfo"></div>
+  <div style="text-align:center;color:#aaa;font-size:11px;padding:8px;border-top:1px solid #eef1f6">Version de l'appli : 18</div>
 </div>
 <div id="fenetreRdv" class="cache"><div class="boite">
   <div class="titre"><b id="fenetreTitre"></b><button type="button" id="fermerFenetre" aria-label="Fermer">×</button></div>
@@ -955,7 +956,10 @@
 
   /* ---------- Appli installable : fonctionne même sans réseau ---------- */
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(function () {});
+    // updateViaCache 'none' : le téléphone vérifie toujours la vraie dernière version ; on revérifie à chaque retour dans l'appli
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
+      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') reg.update().catch(function () {}); });
+    }).catch(function () {});
   }
 </script>
 </body>
