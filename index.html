@@ -677,10 +677,15 @@
     var x = new Date(d + 'T12:00:00');
     return ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'][x.getDay()] + ' ' + deux(x.getDate()) + '/' + deux(x.getMonth() + 1);
   }
-  // Menu ☰ : un bouton par jour (aujourd'hui + 4 jours), qui ouvre la fenêtre des interventions du jour
+  // Menu ☰ : un bouton par jour (5 jours, sans les dimanches), qui ouvre la fenêtre des interventions du jour
   function cinqJours() {
     var j = [];
-    for (var i = 0; i < 5; i++) { var d = new Date(); d.setDate(d.getDate() + i); j.push(d.getFullYear() + '-' + deux(d.getMonth() + 1) + '-' + deux(d.getDate())); }
+    // 5 jours de travail : on saute les dimanches
+    for (var i = 0; j.length < 5; i++) {
+      var d = new Date(); d.setDate(d.getDate() + i);
+      if (d.getDay() === 0) continue;
+      j.push(d.getFullYear() + '-' + deux(d.getMonth() + 1) + '-' + deux(d.getDate()));
+    }
     return j;
   }
   var jourOuvert = '';
