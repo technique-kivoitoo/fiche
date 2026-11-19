@@ -108,12 +108,13 @@
 <body>
 <header><div class="gauche"><button id="btnHisto" type="button" aria-label="Menu : mes fiches et mes interventions">☰<span class="nb" id="nbAttente"></span></button><img id="logo" alt="Kivoitoo" src="logo.png" style="display:block"></div><span class="nom">Fiche d'intervention</span></header>
 <div id="histo" class="cache">
+  <button type="button" class="choix" id="choixVierge"><span>🗒️ Nouvelle fiche vierge</span><span class="fl">›</span></button>
   <button type="button" class="choix" id="choixFiches"><span>📄 Mes fiches envoyées<span class="nbf" id="nbAttenteMenu"></span></span><span class="fl">›</span></button>
   <div id="listeFiches" class="cache"></div>
   <div class="choix"><span>📅 Interventions prévues</span><button type="button" class="btn" id="majRdv" aria-label="Actualiser les RDV">↻</button></div>
   <div id="joursRdv"></div>
   <div id="rdvInfo"></div>
-  <div style="text-align:center;color:#aaa;font-size:11px;padding:8px;border-top:1px solid #eef1f6">Version de l'appli : 18</div>
+  <div style="text-align:center;color:#aaa;font-size:11px;padding:8px;border-top:1px solid #eef1f6">Version de l'appli : 19</div>
 </div>
 <div id="fenetreRdv" class="cache"><div class="boite">
   <div class="titre"><b id="fenetreTitre"></b><button type="button" id="fermerFenetre" aria-label="Fermer">×</button></div>
@@ -220,6 +221,7 @@
     </div>
 
     <button class="btn-plein" id="valider" type="submit">Valider la fiche</button>
+    <button type="button" class="btn" id="btnVierge" style="display:block;width:100%;margin-top:10px;color:#a33;border-color:#e3c4c4">Effacer tout et repartir d'une fiche vierge</button>
   </form>
 
 </main>
@@ -476,6 +478,7 @@
     $('vignetteSim').innerHTML = ''; $('vignetteSimNouvelle').innerHTML = '';
     $('blocSim').classList.add('cache'); $('blocPiles').classList.add('cache'); modeAutre(false); clientChoisi = null;
     modeModif(null);
+    $('rdvId').value = ''; $('rdvMotif').value = '';   // champs cachés : reset() ne les vide pas
     $('motifRdv').classList.add('cache'); $('choixClientRdv').classList.add('cache');
     initFiche();
     afficherRdv();
@@ -637,6 +640,16 @@
     });
     $('listeFiches').innerHTML = html;
   }
+  // Fiche vierge : en cas d'erreur de client ou de RDV, on efface tout (le technicien et la date du jour restent)
+  function ficheVierge() {
+    var vide = !$('client').value.trim() && !$('travaux').value.trim() && !$('rdvId').value && !modification;
+    if (!vide && !confirm('Effacer toute la fiche en cours et repartir d’une fiche vierge ?')) return;
+    effacerBrouillon(); reinitialiser(); cacherMessage();
+    $('histo').classList.add('cache');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  $('choixVierge').onclick = ficheVierge;
+  $('btnVierge').onclick = ficheVierge;
   $('choixFiches').onclick = function () {
     var ouvert = $('listeFiches').classList.toggle('cache') === false;
     this.classList.toggle('ouvert', ouvert);

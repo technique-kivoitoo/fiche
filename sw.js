@@ -1,6 +1,6 @@
 /* Fiche intervention Kivoitoo : garde l'appli dans le téléphone pour l'ouvrir même sans réseau.
    Avec du réseau : on prend toujours la dernière version publiée (la page). Sans réseau : la copie gardée en mémoire. */
-const VERSION = 'fiche-v18';
+const VERSION = 'fiche-v19';
 const FICHIERS = ['./', 'index.html', 'manifest.webmanifest', 'logo.png', 'icone-180.png', 'icone-192.png', 'icone-512.png'];
 
 self.addEventListener('install', e => {
