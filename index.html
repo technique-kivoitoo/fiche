@@ -114,7 +114,7 @@
   <div class="choix"><span>📅 Interventions prévues</span><button type="button" class="btn" id="majRdv" aria-label="Actualiser les RDV">↻</button></div>
   <div id="joursRdv"></div>
   <div id="rdvInfo"></div>
-  <div style="text-align:center;color:#aaa;font-size:11px;padding:8px;border-top:1px solid #eef1f6">Version de l'appli : 19</div>
+  <div style="text-align:center;color:#aaa;font-size:11px;padding:8px;border-top:1px solid #eef1f6">Version de l'appli : 20</div>
 </div>
 <div id="fenetreRdv" class="cache"><div class="boite">
   <div class="titre"><b id="fenetreTitre"></b><button type="button" id="fermerFenetre" aria-label="Fermer">×</button></div>
@@ -221,7 +221,6 @@
     </div>
 
     <button class="btn-plein" id="valider" type="submit">Valider la fiche</button>
-    <button type="button" class="btn" id="btnVierge" style="display:block;width:100%;margin-top:10px;color:#a33;border-color:#e3c4c4">Effacer tout et repartir d'une fiche vierge</button>
   </form>
 
 </main>
@@ -649,7 +648,6 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   $('choixVierge').onclick = ficheVierge;
-  $('btnVierge').onclick = ficheVierge;
   $('choixFiches').onclick = function () {
     var ouvert = $('listeFiches').classList.toggle('cache') === false;
     this.classList.toggle('ouvert', ouvert);
