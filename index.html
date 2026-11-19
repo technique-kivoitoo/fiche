@@ -765,8 +765,11 @@
     $('choixClientRdv').classList.add('cache'); sauverBrouillon();
   }
   function utiliserRdv(r) {
-    if (r.id === $('rdvId').value) { $('carteIntervention').scrollIntoView({ behavior: 'smooth' }); return; }
-    if (($('client').value.trim() || $('travaux').value.trim()) && !confirm('Remplacer la fiche en cours par le RDV « ' + r.titre + ' » ?')) return;
+    // Même RDV touché à nouveau : on remet la fiche comme au départ (utile après une fausse manip)
+    var question = r.id === $('rdvId').value
+      ? 'Remettre la fiche « ' + r.titre + ' » comme au départ ? Ce que vous avez changé sera effacé.'
+      : 'Remplacer la fiche en cours par le RDV « ' + r.titre + ' » ?';
+    if (($('client').value.trim() || $('travaux').value.trim() || r.id === $('rdvId').value) && !confirm(question)) return;
     effacerBrouillon(); reinitialiser(); cacherMessage();
     if (r.date) $('date').value = r.date;
     $('heureArrivee').value = r.heure || heureMaintenant();
