@@ -114,7 +114,7 @@
   <div class="choix"><span>📅 Interventions prévues</span><button type="button" class="btn" id="majRdv" aria-label="Actualiser les RDV">↻</button></div>
   <div id="joursRdv"></div>
   <div id="rdvInfo"></div>
-  <div style="text-align:center;color:#aaa;font-size:11px;padding:8px;border-top:1px solid #eef1f6">Version de l'appli : 20</div>
+  <div style="text-align:center;color:#aaa;font-size:11px;padding:8px;border-top:1px solid #eef1f6">Version de l'appli : 21</div>
 </div>
 <div id="fenetreRdv" class="cache"><div class="boite">
   <div class="titre"><b id="fenetreTitre"></b><button type="button" id="fermerFenetre" aria-label="Fermer">×</button></div>
@@ -669,9 +669,12 @@
     try { var c = JSON.parse(memoire('rdv_' + tech) || 'null'); rdvListe = c ? c.rdv || [] : []; $('rdvInfo').textContent = c && c.maj ? 'Agenda lu le ' + c.maj : ''; } catch (e) { rdvListe = []; }
     afficherRdv();
     if (!tech || !navigator.onLine || !(codeAcces || memoire('codeAcces'))) return;
-    if (!force && Date.now() - rdvDernier < 5 * 60000) return;
+    // force : relecture directe de l'agenda (menu ouvert, bouton ↻) ; sinon au plus une fois par minute
+    if (!force && Date.now() - rdvDernier < 60000) return;
+    if (force && Date.now() - rdvDernier < 15000) return;   // évite les doubles appels rapprochés
     rdvDernier = Date.now();
-    appelServeur('rdv', codeAcces || memoire('codeAcces'), { technicien: tech })
+    $('rdvInfo').textContent = 'Lecture de l’agenda…';
+    appelServeur('rdv', codeAcces || memoire('codeAcces'), { technicien: tech, frais: !!force })
       .then(function (r) {
         if ($('technicien').value !== tech) return;
         if (r.erreur) { $('rdvInfo').textContent = r.erreur; return; }
@@ -679,9 +682,12 @@
         rdvListe = r.rdv || []; $('rdvInfo').textContent = 'Agenda lu le ' + r.maj;
         afficherRdv();
       })
-      .catch(function () { if (!rdvListe.length) $('rdvInfo').textContent = 'RDV indisponibles pour l’instant.'; });
+      .catch(function () {
+        try { var c = JSON.parse(memoire('rdv_' + tech) || 'null'); $('rdvInfo').textContent = c && c.maj ? 'Pas de réseau : agenda lu le ' + c.maj : 'RDV indisponibles pour l’instant.'; }
+        catch (e) { $('rdvInfo').textContent = 'RDV indisponibles pour l’instant.'; }
+      });
   }
-  $('majRdv').onclick = function (e) { e.stopPropagation(); chargerRdv(true); };
+  $('majRdv').onclick = function (e) { e.stopPropagation(); rdvDernier = 0; chargerRdv(true); };
   function nomJour(d) {
     var auj = aujourdhui(), dem = new Date(); dem.setDate(dem.getDate() + 1);
     if (d === auj) return 'Aujourd’hui';
@@ -863,7 +869,7 @@
     }).catch(function () { message('Impossible de rouvrir cette fiche sur ce téléphone.', 'err'); });
   }
 
-  $('btnHisto').onclick = function (e) { e.stopPropagation(); histoAfficher(); afficherRdv(); $('histo').classList.toggle('cache'); if (!$('histo').classList.contains('cache')) chargerRdv(false); };
+  $('btnHisto').onclick = function (e) { e.stopPropagation(); histoAfficher(); afficherRdv(); $('histo').classList.toggle('cache'); if (!$('histo').classList.contains('cache')) chargerRdv(true); };
   document.addEventListener('click', function (e) {
     if (!$('histo').classList.contains('cache') && !$('histo').contains(e.target) && !$('fenetreRdv').contains(e.target)) $('histo').classList.add('cache');
   });
