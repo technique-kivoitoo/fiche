@@ -114,7 +114,7 @@
   <div class="choix"><span>📅 Interventions prévues</span><button type="button" class="btn" id="majRdv" aria-label="Actualiser les RDV">↻</button></div>
   <div id="joursRdv"></div>
   <div id="rdvInfo"></div>
-  <div style="text-align:center;color:#aaa;font-size:11px;padding:8px;border-top:1px solid #eef1f6">Version de l'appli : 21</div>
+  <div style="text-align:center;color:#aaa;font-size:11px;padding:8px;border-top:1px solid #eef1f6">Version de l'appli : 22</div>
 </div>
 <div id="fenetreRdv" class="cache"><div class="boite">
   <div class="titre"><b id="fenetreTitre"></b><button type="button" id="fermerFenetre" aria-label="Fermer">×</button></div>
@@ -538,7 +538,7 @@
       .then(function () {
         b.disabled = false;
         message('Fiche enregistrée sur le téléphone. ' + (navigator.onLine
-          ? 'Envoi en cours, vous pouvez commencer la fiche suivante.'
+          ? 'Envoi en cours… Ne refaites pas la fiche : un message « ✓ bien envoyée » s’affichera ici, et vous pouvez commencer la fiche suivante.'
           : 'Pas de réseau : elle est gardée sur le téléphone. Rouvrez l’appli dès que vous avez du réseau pour l’envoyer.'), 'ok');
         effacerBrouillon();
         reinitialiser();
@@ -899,14 +899,14 @@
       var n = liste.length, s = n > 1 ? 's' : '';
       pastille(n);
       if (!navigator.onLine) { envoiEnCours = false; bandeau(n + ' fiche' + s + ' en attente : envoi dès que le réseau revient'); return; }
-      bandeau('Envoi en cours… (' + n + ' fiche' + s + ' en attente)');
+      bandeau('Envoi en cours… (' + n + ' fiche' + s + ' en attente) : ne la refaites pas, elle partira toute seule');
       var f = liste[0];
       appelServeur('fiche', codeAcces || memoire('codeAcces'), f.donnees)
         .then(function (r) {
           histoEnvoyee(f.idLocal, r.id);
           fileSupprimer(f.idLocal).then(function () {
             envoiEnCours = false;
-            message('Fiche ' + r.id + ' envoyée (' + f.client + ').', 'ok');
+            message('✓ Fiche ' + r.id + ' bien envoyée pour ' + f.client + '. Inutile de la refaire : elle est dans ☰ › Mes fiches envoyées.', 'ok');
             traiterFile();
           });
         })
